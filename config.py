@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Enhanced Configuration for CyberCrawl Spider Robot
-Optimized for superior image quality and colors
+Configuration settings for CyberCrawl Spider Robot
+OPTIMIZED for better FPS and natural image quality
 """
 
 # ===== Flask Server Settings =====
@@ -12,13 +12,15 @@ DEBUG = False
 # ===== GPIO Pin Assignments =====
 ULTRASONIC_TRIGGER_PIN = 23
 ULTRASONIC_ECHO_PIN = 24
-NIGHT_VISION_GPIO = 18
+NIGHT_VISION_GPIO = 18  # Optional IR LED control
 
 # ===== PCA9685 Servo Driver Settings =====
 PCA9685_ADDRESS = 0x40
-PCA9685_FREQUENCY = 50
+PCA9685_FREQUENCY = 50  # Hz (standard for servos)
 
 # ===== Servo Channel Mapping =====
+# Leg numbering: 0=Front-Right, 1=Front-Left, 2=Rear-Left, 3=Rear-Right
+# Joint numbering: 0=Coxa, 1=Femur, 2=Tibia
 SERVO_CHANNELS = [
     [0, 1, 2],    # Leg 0 (Front-Right)
     [4, 5, 6],    # Leg 1 (Front-Left)
@@ -27,22 +29,22 @@ SERVO_CHANNELS = [
 ]
 
 # ===== Servo Calibration =====
-SERVO_PULSE_RANGE = [150, 600]
+SERVO_PULSE_RANGE = [150, 600]  # Pulse width for 0-180 degrees
 
 # ===== Robot Physical Dimensions (mm) =====
-LENGTH_A = 55.0
-LENGTH_B = 77.5
-LENGTH_C = 27.5
-LENGTH_SIDE = 71.0
+LENGTH_A = 55.0      # Upper leg length
+LENGTH_B = 77.5      # Lower leg length
+LENGTH_C = 27.5      # Coxa length
+LENGTH_SIDE = 71.0   # Body side length
 
 # ===== Movement Parameters =====
-Z_DEFAULT = -50.0
-Z_UP = -30.0
-Z_BOOT = -28.0
-X_DEFAULT = 62.0
-X_OFFSET = 0.0
-Y_START = 0.0
-Y_STEP = 40.0
+Z_DEFAULT = -50.0    # Default standing height
+Z_UP = -30.0         # Leg lift height
+Z_BOOT = -28.0       # Boot/sit position
+X_DEFAULT = 62.0     # Default X position
+X_OFFSET = 0.0       # X offset for body
+Y_START = 0.0        # Starting Y position
+Y_STEP = 40.0        # Step length
 
 # ===== Movement Speeds =====
 LEG_MOVE_SPEED = 8.0
@@ -52,175 +54,152 @@ STAND_SEAT_SPEED = 1.0
 SPEED_MULTIPLE = 1.2
 
 # ===== Ultrasonic Sensor Settings =====
-OBSTACLE_THRESHOLD = 20
-MAX_DISTANCE = 200
+OBSTACLE_THRESHOLD = 20  # cm - distance to trigger avoidance
+MAX_DISTANCE = 200       # cm - maximum detection range
 
-# ===== ENHANCED CAMERA SETTINGS =====
-# Resolution: Higher = better quality, lower FPS
-# Options: (640, 480), (800, 600), (1280, 720), (1920, 1080)
-CAMERA_RESOLUTION = (640, 480)  # Good balance for Pi 3
+# ===== OPTIMIZED CAMERA SETTINGS =====
+"""
+Quality Modes:
+- 'high': Best quality, natural image, ~15-20 FPS (800x600)
+- 'balanced': Good quality, smooth video, ~20-25 FPS (640x480) [RECOMMENDED]
+- 'performance': Maximum FPS, ~25-30 FPS (320x240)
+"""
+CAMERA_QUALITY_MODE = 'balanced'  # Change to 'high' or 'performance' as needed
 
-# Frame rate: Lower = better quality per frame
-# Recommended: 10-15 for Pi 3, 20-30 for Pi 4/5
-CAMERA_FPS = 12  # Reduced slightly for better processing time
+# Resolution (auto-adjusted based on quality mode)
+CAMERA_RESOLUTION = (640, 480)  # Balanced: good quality + performance
+
+# FPS Target (higher = smoother video)
+CAMERA_FPS = 25  # Optimized for Raspberry Pi 3/4
 
 # Camera warmup time
-CAMERA_WARMUP_TIME = 2
+CAMERA_WARMUP_TIME = 1  # Reduced from 2 seconds
 
-# Camera rotation (0, 90, 180, 270)
-CAMERA_ROTATION = 0
+# Camera rotation
+CAMERA_ROTATION = 0  # 0, 90, 180, 270
 
-# ===== IMAGE ENHANCEMENT SETTINGS =====
-# Enable/disable real-time image enhancement
-ENABLE_IMAGE_ENHANCEMENT = True
+# ===== IMAGE PROCESSING SETTINGS =====
+"""
+Processing Presets:
+- 'natural_hq': Best quality, natural colors, slight performance impact
+- 'balanced': Good quality with minimal processing [RECOMMENDED]
+- 'performance': Minimal processing for maximum FPS
+"""
+IMAGE_PROCESSING_PRESET = 'balanced'
 
-# Brightness adjustment (-100 to 100)
-# Positive = brighter, Negative = darker
-BRIGHTNESS_ADJUST = 15
-
-# Contrast adjustment (-100 to 100)
-# Higher = more contrast
-CONTRAST_ADJUST = 20
-
-# Color saturation (0.5 to 2.0)
-# 1.0 = normal, >1.0 = more vibrant
-SATURATION_FACTOR = 1.3
-
-# Sharpness
-ENABLE_SHARPENING = True
-
-# Noise reduction (reduces FPS but cleaner image)
-ENABLE_DENOISING = False
-
-# ===== VIDEO STREAMING QUALITY =====
-# JPEG compression quality (1-100)
-# Higher = better quality but more bandwidth
-# Recommended: 85-95 for good quality, 70-85 for performance
-VIDEO_QUALITY = 92  # High quality
+# Enable specific enhancements (only used in 'balanced' mode)
+ENABLE_DENOISING = True        # Reduces grain/noise
+ENABLE_CONTRAST_BOOST = True   # Better visibility
+ENABLE_SHARPENING = False      # Keep False for natural look
 
 # ===== YOLOv8 DETECTION SETTINGS =====
-# Model options:
-# - yolov8n.pt (nano - fastest, ~6MB)
-# - yolov8s.pt (small - balanced, ~22MB)
-# - yolov8m.pt (medium - slower, ~52MB)
-YOLO_MODEL_PATH = 'yolov8n.pt'
-
-# Confidence threshold (0.0 to 1.0)
-# Lower = more detections (but more false positives)
+YOLO_MODEL_PATH = 'yolov8n.pt'  # Nano model (fastest)
 YOLO_CONFIDENCE_THRESHOLD = 0.5
-
-# IoU threshold for NMS
 YOLO_IOU_THRESHOLD = 0.45
+YOLO_MAX_DETECTIONS = 10  # Limit for performance
 
-# Maximum detections per frame
-YOLO_MAX_DETECTIONS = 10
+# ===== PERFORMANCE OPTIMIZATION =====
+"""
+Key settings for FPS improvement:
+- DETECTION_INTERVAL: Time between YOLO inferences
+  Lower = more frequent detection but lower FPS
+  Higher = less frequent detection but higher FPS
+"""
+DETECTION_INTERVAL = 0.15  # Optimized: run YOLO every 150ms
 
-# ===== PERFORMANCE TUNING =====
-# Time between YOLO inferences (seconds)
-# Higher = lower CPU usage, less frequent detection
-# Lower = more frequent detection, higher CPU
-DETECTION_INTERVAL = 0.15  # Slightly increased for better frame processing
+# Video streaming quality
+VIDEO_QUALITY = 90  # JPEG compression (85-95 recommended)
+                    # Higher = better quality, larger bandwidth
 
-# Enable multi-threading
+# Frame buffer settings
+FRAME_BUFFER_SIZE = 3  # Smaller buffer = lower latency
+
+# Threading optimization
 ENABLE_THREADING = True
+MAX_THREAD_WORKERS = 2
 
-# ===== AUTO MODE SETTINGS =====
-AUTO_MODE_LOOP_DELAY = 0.05
-AUTO_DETECTION_FREQUENCY = 0.5
-
-# ===== NIGHT VISION SETTINGS =====
-NIGHT_VISION_THRESHOLD = 50
-ENABLE_NIGHT_VISION = False
-
-# ===== COLOR GRADING PRESETS =====
-# Available presets: 'natural', 'vibrant', 'warm', 'cool', 'cinematic'
-COLOR_PRESET = 'vibrant'
-
-# Preset definitions
-COLOR_PRESETS = {
-    'natural': {
-        'brightness': 0,
-        'contrast': 10,
-        'saturation': 1.0,
-        'description': 'Neutral, realistic colors'
-    },
-    'vibrant': {
-        'brightness': 15,
-        'contrast': 20,
-        'saturation': 1.3,
-        'description': 'Punchy, vivid colors'
-    },
-    'warm': {
-        'brightness': 10,
-        'contrast': 15,
-        'saturation': 1.2,
-        'temperature': 'warm',
-        'description': 'Warm, orange-shifted tones'
-    },
-    'cool': {
-        'brightness': 5,
-        'contrast': 15,
-        'saturation': 1.1,
-        'temperature': 'cool',
-        'description': 'Cool, blue-shifted tones'
-    },
-    'cinematic': {
-        'brightness': -5,
-        'contrast': 30,
-        'saturation': 1.4,
-        'description': 'Film-like with crushed blacks'
-    }
+# ===== CAMERA HARDWARE CONTROLS =====
+"""
+These control the actual camera sensor behavior
+Set to 'auto' for natural-looking images
+"""
+CAMERA_CONTROLS = {
+    # Auto White Balance (AWB)
+    'AwbEnable': True,
+    'AwbMode': 0,  # 0=Auto, 1=Tungsten, 2=Fluorescent, 3=Indoor, 4=Daylight, 5=Cloudy
+    
+    # Auto Exposure (AE)
+    'AeEnable': True,
+    'AeExposureMode': 0,  # 0=Normal, 1=Short, 2=Long, 3=Custom
+    'AeConstraintMode': 0,  # 0=Normal, 1=Highlight, 2=Shadow
+    'AeMeteringMode': 0,   # 0=Centre, 1=Spot, 2=Matrix, 3=Custom
+    
+    # Image adjustments (neutral values for natural look)
+    'Brightness': 0.0,     # -1.0 to 1.0 (0.0 = neutral)
+    'Contrast': 1.0,       # 0.0 to 2.0 (1.0 = neutral)
+    'Saturation': 1.0,     # 0.0 to 2.0 (1.0 = neutral)
+    'Sharpness': 1.0,      # 0.0 to 16.0 (1.0 = moderate)
+    
+    # Noise reduction
+    'NoiseReductionMode': 1,  # 0=Off, 1=Fast, 2=HighQuality
+    
+    # Color gains (for fine-tuning white balance)
+    'ColourGains': (1.0, 1.0),  # (red_gain, blue_gain)
 }
 
-# ===== ADVANCED CAMERA CONTROLS =====
-# Fine-tune these if needed
-CAMERA_AWB_MODE = 0  # 0=Auto, 1=Tungsten, 2=Fluorescent, 3=Indoor, 4=Daylight, 5=Cloudy
-CAMERA_AE_MODE = 0   # 0=Normal, 1=Short, 2=Long, 3=Custom
-CAMERA_METERING_MODE = 0  # 0=Centre, 1=Spot, 2=Matrix, 3=Custom
+# ===== AUTO MODE SETTINGS =====
+AUTO_MODE_LOOP_DELAY = 0.05  # seconds between sensor readings
+AUTO_DETECTION_FREQUENCY = 0.5  # seconds between object checks
 
-# ===== PERFORMANCE PROFILES =====
-# Uncomment one profile or create your own
+# ===== NIGHT VISION SETTINGS =====
+NIGHT_VISION_THRESHOLD = 50  # Brightness threshold
+ENABLE_NIGHT_VISION = False  # Set to True if IR LEDs are connected
 
-# HIGH QUALITY (slower, best image)
-# CAMERA_RESOLUTION = (800, 600)
-# CAMERA_FPS = 10
-# VIDEO_QUALITY = 95
-# DETECTION_INTERVAL = 0.2
-# ENABLE_IMAGE_ENHANCEMENT = True
+# ===== ADVANCED PERFORMANCE TUNING =====
+"""
+For Raspberry Pi 3:
+- Use 'balanced' or 'performance' mode
+- CAMERA_FPS = 20-25
+- DETECTION_INTERVAL = 0.15-0.2
 
-# BALANCED (default - good quality and speed)
-CAMERA_RESOLUTION = (640, 480)
-CAMERA_FPS = 12
-VIDEO_QUALITY = 92
-DETECTION_INTERVAL = 0.15
-ENABLE_IMAGE_ENHANCEMENT = True
+For Raspberry Pi 4/5:
+- Can use 'high' mode
+- CAMERA_FPS = 25-30
+- DETECTION_INTERVAL = 0.1
+"""
 
-# PERFORMANCE (faster, lower quality)
-# CAMERA_RESOLUTION = (320, 240)
-# CAMERA_FPS = 20
-# VIDEO_QUALITY = 80
-# DETECTION_INTERVAL = 0.1
-# ENABLE_IMAGE_ENHANCEMENT = False
+# Adaptive quality (experimental)
+ENABLE_ADAPTIVE_QUALITY = False  # Automatically adjust based on CPU load
 
-# ===== DISPLAY SETTINGS =====
-# Show FPS on overlay
-SHOW_FPS_OVERLAY = True
+# Debug mode
+SHOW_FPS_IN_CONSOLE = False  # Print FPS to console
+SHOW_DETECTION_LOGS = False  # Print detection info
 
-# Show detection count
-SHOW_DETECTION_COUNT = True
+# ===== QUICK PRESETS =====
+"""
+Copy one of these preset configurations:
 
-# Bounding box thickness
-BBOX_THICKNESS = 3
+PRESET 1 - MAXIMUM QUALITY (for photography/recording):
+    CAMERA_QUALITY_MODE = 'high'
+    CAMERA_RESOLUTION = (800, 600)
+    CAMERA_FPS = 15
+    IMAGE_PROCESSING_PRESET = 'natural_hq'
+    DETECTION_INTERVAL = 0.2
+    VIDEO_QUALITY = 95
 
-# Label font scale
-LABEL_FONT_SCALE = 0.7
+PRESET 2 - BALANCED (RECOMMENDED for general use):
+    CAMERA_QUALITY_MODE = 'balanced'
+    CAMERA_RESOLUTION = (640, 480)
+    CAMERA_FPS = 25
+    IMAGE_PROCESSING_PRESET = 'balanced'
+    DETECTION_INTERVAL = 0.15
+    VIDEO_QUALITY = 90
 
-# ===== DEBUGGING =====
-# Print frame capture stats
-DEBUG_FRAME_CAPTURE = False
-
-# Print detection results
-DEBUG_DETECTIONS = False
-
-# Verbose YOLO output
-YOLO_VERBOSE = False
+PRESET 3 - MAXIMUM FPS (for fast-moving objects):
+    CAMERA_QUALITY_MODE = 'performance'
+    CAMERA_RESOLUTION = (320, 240)
+    CAMERA_FPS = 30
+    IMAGE_PROCESSING_PRESET = 'performance'
+    DETECTION_INTERVAL = 0.1
+    VIDEO_QUALITY = 85
+"""
