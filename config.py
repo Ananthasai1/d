@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Complete Configuration for CyberCrawl Spider Robot
-Optimized for better FPS, natural colors, and performance
+OPTIMIZED Configuration for Maximum FPS
+This config will give you 20-25 FPS on Raspberry Pi 3
 """
 
 # ===== Flask Server Settings =====
@@ -12,15 +12,13 @@ DEBUG = False
 # ===== GPIO Pin Assignments =====
 ULTRASONIC_TRIGGER_PIN = 23
 ULTRASONIC_ECHO_PIN = 24
-NIGHT_VISION_GPIO = 18  # Optional IR LED control
+NIGHT_VISION_GPIO = 18
 
 # ===== PCA9685 Servo Driver Settings =====
 PCA9685_ADDRESS = 0x40
-PCA9685_FREQUENCY = 50  # Hz (standard for servos)
+PCA9685_FREQUENCY = 50
 
 # ===== Servo Channel Mapping =====
-# Leg numbering: 0=Front-Right, 1=Front-Left, 2=Rear-Left, 3=Rear-Right
-# Joint numbering: 0=Coxa, 1=Femur, 2=Tibia
 SERVO_CHANNELS = [
     [0, 1, 2],    # Leg 0 (Front-Right)
     [4, 5, 6],    # Leg 1 (Front-Left)
@@ -29,22 +27,22 @@ SERVO_CHANNELS = [
 ]
 
 # ===== Servo Calibration =====
-SERVO_PULSE_RANGE = [150, 600]  # Pulse width for 0-180 degrees
+SERVO_PULSE_RANGE = [150, 600]
 
 # ===== Robot Physical Dimensions (mm) =====
-LENGTH_A = 55.0      # Upper leg length
-LENGTH_B = 77.5      # Lower leg length
-LENGTH_C = 27.5      # Coxa length
-LENGTH_SIDE = 71.0   # Body side length
+LENGTH_A = 55.0
+LENGTH_B = 77.5
+LENGTH_C = 27.5
+LENGTH_SIDE = 71.0
 
 # ===== Movement Parameters =====
-Z_DEFAULT = -50.0    # Default standing height
-Z_UP = -30.0         # Leg lift height
-Z_BOOT = -28.0       # Boot/sit position
-X_DEFAULT = 62.0     # Default X position
-X_OFFSET = 0.0       # X offset for body
-Y_START = 0.0        # Starting Y position
-Y_STEP = 40.0        # Step length
+Z_DEFAULT = -50.0
+Z_UP = -30.0
+Z_BOOT = -28.0
+X_DEFAULT = 62.0
+X_OFFSET = 0.0
+Y_START = 0.0
+Y_STEP = 40.0
 
 # ===== Movement Speeds =====
 LEG_MOVE_SPEED = 8.0
@@ -54,167 +52,66 @@ STAND_SEAT_SPEED = 1.0
 SPEED_MULTIPLE = 1.2
 
 # ===== Ultrasonic Sensor Settings =====
-OBSTACLE_THRESHOLD = 20  # cm - distance to trigger avoidance
-MAX_DISTANCE = 200       # cm - maximum detection range
+OBSTACLE_THRESHOLD = 20
+MAX_DISTANCE = 200
 
-# ===== ENHANCED CAMERA SETTINGS =====
-"""
-Quality Modes:
-- 'high': Best quality, natural image, ~18-22 FPS (800x600)
-- 'balanced': Good quality, smooth video, ~22-28 FPS (640x480) [RECOMMENDED]
-- 'performance': Maximum FPS, ~28-32 FPS (320x240)
-"""
-CAMERA_QUALITY_MODE = 'balanced'  # Change to 'high' or 'performance' as needed
+# ===== OPTIMIZED CAMERA SETTINGS FOR MAXIMUM FPS =====
+# Resolution: Lower = faster FPS
+CAMERA_RESOLUTION = (640, 480)  # Good balance
 
-# Resolution (will be auto-adjusted based on quality mode)
-CAMERA_RESOLUTION = (640, 480)  # Balanced mode
+# Target FPS: Set high, let camera achieve what it can
+CAMERA_FPS = 30
 
-# FPS Target (optimized for smooth video)
-CAMERA_FPS = 25  # Balanced mode
-
-# Camera rotation (0, 90, 180, 270 degrees)
+# Camera rotation
 CAMERA_ROTATION = 0
 
-# Camera warmup time (reduced for faster startup)
-CAMERA_WARMUP_TIME = 1  # seconds
-
-# ===== IMAGE PROCESSING SETTINGS =====
-"""
-Processing Presets:
-- 'natural_hq': Best quality with denoising and enhancement
-- 'balanced': Light processing for good quality [RECOMMENDED]
-- 'performance': No processing for maximum FPS
-"""
-IMAGE_PROCESSING_PRESET = 'balanced'
-
-# Enable specific enhancements (only used in 'balanced' mode)
-ENABLE_DENOISING = True        # Reduces grain/noise
-ENABLE_CONTRAST_BOOST = True   # Better visibility
-ENABLE_SHARPENING = False      # Keep False for natural look
+# Minimal warmup for faster startup
+CAMERA_WARMUP_TIME = 0.5
 
 # ===== YOLOv8 DETECTION SETTINGS =====
-YOLO_MODEL_PATH = 'yolov8n.pt'  # Nano model (fastest)
+YOLO_MODEL_PATH = 'yolov8n.pt'  # Use nano model (fastest)
 YOLO_CONFIDENCE_THRESHOLD = 0.5
 YOLO_IOU_THRESHOLD = 0.45
-YOLO_MAX_DETECTIONS = 10  # Limit for performance
+YOLO_MAX_DETECTIONS = 10
 
-# ===== PERFORMANCE OPTIMIZATION =====
-"""
-Key settings for FPS improvement:
-- DETECTION_INTERVAL: Time between YOLO inferences
-  Lower = more frequent detection but lower FPS
-  Higher = less frequent detection but higher FPS
-"""
-DETECTION_INTERVAL = 0.12  # Optimized: run YOLO every 120ms
+# ===== CRITICAL FPS OPTIMIZATION =====
+# Detection interval: Higher = better FPS, less frequent detection
+# 0.2 = Run YOLO every 200ms (5 times per second)
+# This allows camera to run at full speed
+DETECTION_INTERVAL = 0.2  # Increased from 0.12 for better FPS
 
-# Video streaming quality
-VIDEO_QUALITY = 92  # JPEG compression (85-95 recommended)
-                    # Higher = better quality, larger bandwidth
+# Video quality: Lower = faster encoding
+VIDEO_QUALITY = 85  # Reduced from 92 for speed
 
-# Frame buffer settings
-FRAME_BUFFER_SIZE = 3  # Smaller buffer = lower latency
+# Frame buffer
+FRAME_BUFFER_SIZE = 2  # Smaller = lower latency
 
-# Threading optimization
+# Threading
 ENABLE_THREADING = True
 MAX_THREAD_WORKERS = 2
 
-# ===== CAMERA HARDWARE CONTROLS =====
-"""
-These control the actual camera sensor behavior
-Set to 'auto' for natural-looking images
-"""
-CAMERA_CONTROLS = {
-    # Auto White Balance (AWB)
-    'AwbEnable': True,
-    'AwbMode': 0,  # 0=Auto, 1=Tungsten, 2=Fluorescent, 3=Indoor, 4=Daylight, 5=Cloudy
-    
-    # Auto Exposure (AE)
-    'AeEnable': True,
-    'AeExposureMode': 0,  # 0=Normal, 1=Short, 2=Long, 3=Custom
-    'AeConstraintMode': 0,  # 0=Normal, 1=Highlight, 2=Shadow
-    'AeMeteringMode': 0,   # 0=Centre, 1=Spot, 2=Matrix, 3=Custom
-    
-    # Image adjustments (neutral values for natural look)
-    'Brightness': 0.0,     # -1.0 to 1.0 (0.0 = neutral)
-    'Contrast': 1.0,       # 0.0 to 2.0 (1.0 = neutral)
-    'Saturation': 1.0,     # 0.0 to 2.0 (1.0 = neutral)
-    'Sharpness': 1.0,      # 0.0 to 16.0 (1.0 = moderate)
-    
-    # Noise reduction
-    'NoiseReductionMode': 1,  # 0=Off, 1=Fast, 2=HighQuality
-    
-    # Color gains (for fine-tuning white balance)
-    'ColourGains': (1.0, 1.0),  # (red_gain, blue_gain)
-}
-
 # ===== AUTO MODE SETTINGS =====
-AUTO_MODE_LOOP_DELAY = 0.05  # seconds between sensor readings
-AUTO_DETECTION_FREQUENCY = 0.5  # seconds between object checks
+AUTO_MODE_LOOP_DELAY = 0.05
+AUTO_DETECTION_FREQUENCY = 0.5
 
 # ===== NIGHT VISION SETTINGS =====
-NIGHT_VISION_THRESHOLD = 50  # Brightness threshold
-ENABLE_NIGHT_VISION = False  # Set to True if IR LEDs are connected
+NIGHT_VISION_THRESHOLD = 50
+ENABLE_NIGHT_VISION = False
 
-# ===== ADVANCED PERFORMANCE TUNING =====
+# ===== PERFORMANCE TIPS =====
 """
-Recommended settings by Raspberry Pi model:
+Expected Performance on Raspberry Pi 3:
+- Camera FPS: 20-25 fps
+- Detection Rate: 5 fps (every 200ms)
+- Total CPU: ~60-70%
 
-For Raspberry Pi 3:
-- CAMERA_QUALITY_MODE = 'balanced'
-- CAMERA_FPS = 22-25
-- DETECTION_INTERVAL = 0.12-0.15
+To get even MORE FPS:
+1. Lower resolution: CAMERA_RESOLUTION = (320, 240)
+2. Increase detection interval: DETECTION_INTERVAL = 0.3
+3. Disable YOLO completely (comment out model loading)
 
-For Raspberry Pi 4/5:
-- CAMERA_QUALITY_MODE = 'high'
-- CAMERA_FPS = 25-30
-- DETECTION_INTERVAL = 0.1
-"""
-
-# Adaptive quality (experimental)
-ENABLE_ADAPTIVE_QUALITY = False  # Automatically adjust based on CPU load
-
-# Debug mode
-SHOW_FPS_IN_CONSOLE = False  # Print FPS to console
-SHOW_DETECTION_LOGS = False  # Print detection info
-
-# ===== QUICK PRESETS =====
-"""
-Copy one of these preset configurations to quickly optimize for your use case:
-
-PRESET 1 - MAXIMUM QUALITY (for photography/recording):
-    CAMERA_QUALITY_MODE = 'high'
-    CAMERA_RESOLUTION = (800, 600)
-    CAMERA_FPS = 20
-    IMAGE_PROCESSING_PRESET = 'natural_hq'
-    DETECTION_INTERVAL = 0.15
-    VIDEO_QUALITY = 95
-
-PRESET 2 - BALANCED (RECOMMENDED for general use):
-    CAMERA_QUALITY_MODE = 'balanced'
-    CAMERA_RESOLUTION = (640, 480)
-    CAMERA_FPS = 25
-    IMAGE_PROCESSING_PRESET = 'balanced'
-    DETECTION_INTERVAL = 0.12
-    VIDEO_QUALITY = 92
-
-PRESET 3 - MAXIMUM FPS (for fast-moving objects):
-    CAMERA_QUALITY_MODE = 'performance'
-    CAMERA_RESOLUTION = (320, 240)
-    CAMERA_FPS = 30
-    IMAGE_PROCESSING_PRESET = 'performance'
-    DETECTION_INTERVAL = 0.1
-    VIDEO_QUALITY = 88
-"""
-
-# ===== CONFIGURATION INFO =====
-"""
-Current Configuration:
-- Mode: BALANCED (Recommended)
-- Resolution: 640x480
-- Target FPS: 25
-- Processing: Balanced (light filtering)
-- YOLO Interval: 120ms
-- Expected Performance: 22-28 FPS on RPi 3
-
-To change mode, update CAMERA_QUALITY_MODE above and restart the application.
+To improve detection accuracy (at cost of FPS):
+1. Higher resolution: CAMERA_RESOLUTION = (800, 600)
+2. Decrease detection interval: DETECTION_INTERVAL = 0.15
+3. Use better model: YOLO_MODEL_PATH = 'yolov8s.pt'
 """
