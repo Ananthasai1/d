@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 """
-Camera and YOLOv8 Detection Module for CyberCrawl
-Fixed for OV5647 Camera on Raspberry Pi OS 64-bit
-FIXED: PyTorch 2.6+ weights_only security issue
+Enhanced Camera with Superior Quality and Colors
+Includes image processing, color grading, and optimized camera settings
 """
 
 import cv2
@@ -13,11 +12,9 @@ from collections import deque
 import os
 import sys
 
-# Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
 
-# Try importing picamera2 (modern interface for libcamera)
 try:
     from picamera2 import Picamera2
     PICAMERA2_AVAILABLE = True
@@ -25,7 +22,6 @@ except ImportError:
     PICAMERA2_AVAILABLE = False
     print("⚠️  picamera2 not available")
 
-# Try importing YOLO
 try:
     from ultralytics import YOLO
     YOLO_AVAILABLE = True
@@ -34,85 +30,162 @@ except ImportError:
     print("⚠️  YOLOv8 not available")
 
 
+class ImageEnhancer:
+    """Real-time image enhancement"""
+    
+    @staticmethod
+    def enhance(frame):
+        """Apply all enhancements"""
+        # 1. Auto white balance
+        frame = ImageEnhancer.auto_white_balance(frame)
+        
+        # 2. Brightness and contrast
+        frame = ImageEnhancer.adjust_brightness_contrast(frame, 
+                                                         brightness=15, 
+                                                         contrast=20)
+        
+        # 3. Boost saturation
+        frame = ImageEnhancer.boost_saturation(frame, 1.3)
+        
+        # 4. Sharpen
+        frame = ImageEnhancer.sharpen(frame)
+        
+        return frame
+    
+    @staticmethod
+    def auto_white_balance(frame):
+        """Improve color accuracy"""
+        result = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+        avg_a = np.average(result[:, :, 1])
+        avg_b = np.average(result[:, :, 2])
+        result[:, :, 1] = result[:, :, 1] - ((avg_a - 128) * (result[:, :, 0] / 255.0) * 1.1)
+        result[:, :, 2] = result[:, :, 2] - ((avg_b - 128) * (result[:, :, 0] / 255.0) * 1.1)
+        return cv2.cvtColor(result, cv2.COLOR_LAB2BGR)
+    
+    @staticmethod
+    def adjust_brightness_contrast(frame, brightness=0, contrast=0):
+        """Adjust brightness and contrast"""
+        if brightness != 0:
+            if brightness > 0:
+                shadow = brightness
+                highlight = 255
+            else:
+                shadow = 0
+                highlight = 255 + brightness
+            alpha_b = (highlight - shadow) / 255
+            gamma_b = shadow
+            frame = cv2.addWeighted(frame, alpha_b, frame, 0, gamma_b)
+        
+        if contrast != 0:
+            f = 131 * (contrast + 127) / (127 * (131 - contrast))
+            alpha_c = f
+            gamma_c = 127 * (1 - f)
+            frame = cv2.addWeighted(frame, alpha_c, frame, 0, gamma_c)
+        
+        return frame
+    
+    @staticmethod
+    def boost_saturation(frame, factor=1.3):
+        """Increase color vibrancy"""
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV).astype(np.float32)
+        hsv[:, :, 1] = hsv[:, :, 1] * factor
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1], 0, 255)
+        hsv = hsv.astype(np.uint8)
+        return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
+    
+    @staticmethod
+    def sharpen(frame):
+        """Sharpen image for better clarity"""
+        kernel = np.array([[-1, -1, -1],
+                          [-1,  9, -1],
+                          [-1, -1, -1]])
+        return cv2.filter2D(frame, -1, kernel)
+
+
 class EnhancedCameraYOLO:
-    """Enhanced camera with YOLOv8 object detection"""
+    """Enhanced camera with superior quality and YOLO detection"""
     
     def __init__(self):
-        """Initialize camera and YOLO"""
-        print("📷 Initializing camera system...")
+        """Initialize with enhanced settings"""
+        print("📷 Initializing enhanced camera system...")
         
-        # Camera and frame variables
         self.camera = None
         self.frame = None
         self.frame_lock = threading.Lock()
-        
-        # Detection variables
         self.detections = []
         self.detection_lock = threading.Lock()
         
-        # Threading control
         self.is_running = False
         self.capture_running = False
         self.detection_running = False
         self.camera_ready = False
         
-        # Performance tracking
         self.fps_counter = deque(maxlen=30)
         self.last_time = time.time()
         self.frame_count = 0
         self.detection_count = 0
         
-        # YOLO model
         self.model = None
         self.model_loaded = False
         
-        # Initialize camera
+        # Enhancement settings
+        self.enable_enhancement = True
+        
         self._init_camera()
         
-        # Load YOLO model if available
         if YOLO_AVAILABLE:
             self._load_yolo_model()
         
-        print("✅ Camera system initialized")
+        print("✅ Enhanced camera system initialized")
     
     def _init_camera(self):
-        """Initialize camera with picamera2"""
-        print("  🎥 Initializing OV5647 camera...")
+        """Initialize camera with optimized settings"""
+        print("  🎥 Initializing OV5647 camera with enhanced settings...")
         
         if not PICAMERA2_AVAILABLE:
             print("  ❌ picamera2 not available")
-            print("  💡 Install: sudo apt install -y python3-picamera2")
             self.camera_type = 'none'
             return
         
         try:
-            # Create Picamera2 instance
             self.camera = Picamera2()
             
-            # Configure camera
+            # Enhanced camera configuration
             camera_config = self.camera.create_still_configuration(
                 main={"size": config.CAMERA_RESOLUTION, "format": "RGB888"},
                 controls={
                     "FrameRate": config.CAMERA_FPS,
-                    "AwbEnable": True,  # Auto white balance
-                    "AeEnable": True,   # Auto exposure
+                    
+                    # Enhanced controls for better image quality
+                    "AwbEnable": True,
+                    "AwbMode": 0,  # Auto white balance
+                    
+                    "AeEnable": True,
+                    "AeExposureMode": 0,  # Normal exposure
+                    "AeConstraintMode": 0,
+                    
+                    # Improved settings
+                    "Brightness": 0.1,      # Slight brightness boost
+                    "Contrast": 1.2,        # Enhanced contrast
+                    "Saturation": 1.3,      # More vibrant colors
+                    "Sharpness": 2.0,       # Better sharpness
+                    
+                    # Noise reduction
+                    "NoiseReductionMode": 1,  # Fast NR
                 }
             )
             
             self.camera.configure(camera_config)
             
-            # Start camera
             print("  ⏳ Starting camera...")
             self.camera.start()
             
-            # Warmup period for auto-exposure
             print(f"  ⏳ Warming up camera ({config.CAMERA_WARMUP_TIME}s)...")
             time.sleep(config.CAMERA_WARMUP_TIME)
             
-            # Capture test frame
             test_frame = self.camera.capture_array()
             if test_frame is not None and test_frame.size > 0:
-                print(f"  ✅ Camera ready! Resolution: {test_frame.shape}")
+                print(f"  ✅ Enhanced camera ready! Resolution: {test_frame.shape}")
                 self.camera_ready = True
                 self.camera_type = 'picamera2'
             else:
@@ -120,10 +193,6 @@ class EnhancedCameraYOLO:
             
         except Exception as e:
             print(f"  ❌ Camera initialization failed: {e}")
-            print("  💡 Troubleshooting:")
-            print("     1. Check camera connection: rpicam-still -t 0")
-            print("     2. Enable camera: sudo raspi-config")
-            print("     3. Install picamera2: sudo apt install -y python3-picamera2")
             self.camera = None
             self.camera_type = 'none'
             self.camera_ready = False
@@ -138,30 +207,22 @@ class EnhancedCameraYOLO:
             if not os.path.exists(model_path):
                 print(f"  📥 Downloading {model_path}...")
             
-            # FIX: Set environment variable to allow unsafe globals
-            # This is needed for PyTorch 2.6+ to load YOLO weights
             os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
             
-            # Try loading with weights_only=False (the fix for the error)
             try:
-                # First attempt: Standard loading
                 self.model = YOLO(model_path)
             except Exception as e1:
-                print(f"  ⚠️  Standard loading failed, trying alternative method...")
+                print(f"  ⚠️  Standard loading failed, trying alternative...")
                 try:
-                    # Second attempt: Use torch.load workaround
                     import torch
-                    # Allow loading with weights_only=False
                     torch.serialization.add_safe_globals(['ultralytics.nn.tasks.DetectionModel'])
                     self.model = YOLO(model_path)
                 except Exception as e2:
-                    print(f"  ⚠️  Alternative method 1 failed, trying final workaround...")
-                    # Third attempt: Patch torch.load temporarily
+                    print(f"  ⚠️  Trying final workaround...")
                     import torch.serialization
                     original_load = torch.load
                     
                     def patched_load(*args, **kwargs):
-                        # Force weights_only=False
                         kwargs['weights_only'] = False
                         return original_load(*args, **kwargs)
                     
@@ -171,9 +232,8 @@ class EnhancedCameraYOLO:
                     finally:
                         torch.load = original_load
             
-            self.model.to('cpu')  # Force CPU on Raspberry Pi
+            self.model.to('cpu')
             
-            # Test inference
             print("  ⏳ Testing model inference...")
             dummy = np.zeros((480, 640, 3), dtype=np.uint8)
             _ = self.model(dummy, verbose=False)
@@ -183,16 +243,11 @@ class EnhancedCameraYOLO:
             
         except Exception as e:
             print(f"  ❌ YOLO loading failed: {e}")
-            print(f"  💡 Error type: {type(e).__name__}")
-            print(f"  💡 If error persists, try:")
-            print(f"     1. pip install --upgrade torch ultralytics")
-            print(f"     2. Delete yolov8n.pt and re-download")
-            print(f"     3. Use: YOLO(model_path, task='detect')")
             self.model_loaded = False
     
     def _capture_frames(self):
-        """Continuous frame capture thread"""
-        print("  🎬 Capture thread started")
+        """Enhanced frame capture with image processing"""
+        print("  🎬 Enhanced capture thread started")
         
         consecutive_errors = 0
         max_errors = 10
@@ -200,14 +255,13 @@ class EnhancedCameraYOLO:
         while self.capture_running:
             try:
                 if self.camera is None or not self.camera_ready:
-                    # Generate placeholder
                     frame = self._generate_placeholder("Camera not available")
                     with self.frame_lock:
                         self.frame = frame
                     time.sleep(1)
                     continue
                 
-                # Capture frame from picamera2
+                # Capture frame
                 frame = self.camera.capture_array()
                 
                 if frame is None or frame.size == 0:
@@ -219,10 +273,9 @@ class EnhancedCameraYOLO:
                     time.sleep(0.1)
                     continue
                 
-                # Reset error counter
                 consecutive_errors = 0
                 
-                # Convert from RGB to BGR for OpenCV
+                # Convert RGB to BGR
                 frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
                 
                 # Apply rotation if needed
@@ -232,6 +285,10 @@ class EnhancedCameraYOLO:
                     frame = cv2.rotate(frame, cv2.ROTATE_180)
                 elif config.CAMERA_ROTATION == 270:
                     frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+                
+                # ✨ APPLY ENHANCEMENTS ✨
+                if self.enable_enhancement:
+                    frame = ImageEnhancer.enhance(frame)
                 
                 # Store frame
                 with self.frame_lock:
@@ -245,26 +302,23 @@ class EnhancedCameraYOLO:
                 self.fps_counter.append(fps)
                 self.last_time = current_time
                 
-                # Log progress every 5 seconds
                 if self.frame_count % 150 == 0:
                     avg_fps = np.mean(list(self.fps_counter))
                     print(f"  📊 Captured {self.frame_count} frames | {avg_fps:.1f} FPS")
                 
-                # Control frame rate
                 time.sleep(1.0 / config.CAMERA_FPS)
                 
             except Exception as e:
                 consecutive_errors += 1
                 print(f"  ❌ Capture error: {e}")
                 if consecutive_errors > max_errors:
-                    print(f"  ⚠️  Too many errors, stopping capture")
                     self.capture_running = False
                 time.sleep(0.1)
         
         print("  🛑 Capture thread stopped")
     
     def _reinit_camera(self):
-        """Reinitialize camera after errors"""
+        """Reinitialize camera"""
         try:
             if self.camera:
                 self.camera.stop()
@@ -274,18 +328,17 @@ class EnhancedCameraYOLO:
             print(f"  ❌ Camera reinit failed: {e}")
     
     def _yolo_detection_thread(self):
-        """YOLOv8 detection thread"""
+        """YOLO detection thread"""
         print("  🔍 Detection thread started")
         
         if not self.model_loaded or self.model is None:
-            print("  ⚠️  Detection unavailable - model not loaded")
+            print("  ⚠️  Detection unavailable")
             return
         
         last_detection = time.time()
         
         while self.detection_running:
             try:
-                # Throttle detection rate
                 current_time = time.time()
                 if current_time - last_detection < config.DETECTION_INTERVAL:
                     time.sleep(0.05)
@@ -293,14 +346,12 @@ class EnhancedCameraYOLO:
                 
                 last_detection = current_time
                 
-                # Get current frame
                 with self.frame_lock:
                     if self.frame is None:
                         time.sleep(0.1)
                         continue
                     frame = self.frame.copy()
                 
-                # Run YOLO inference
                 results = self.model(
                     frame,
                     conf=config.YOLO_CONFIDENCE_THRESHOLD,
@@ -310,7 +361,6 @@ class EnhancedCameraYOLO:
                     max_det=config.YOLO_MAX_DETECTIONS
                 )
                 
-                # Parse results
                 detections = []
                 
                 if len(results) > 0:
@@ -332,7 +382,6 @@ class EnhancedCameraYOLO:
                             }
                             detections.append(detection)
                 
-                # Update detections
                 with self.detection_lock:
                     self.detections = detections
                     self.detection_count = len(detections)
@@ -348,11 +397,9 @@ class EnhancedCameraYOLO:
         frame = np.zeros((config.CAMERA_RESOLUTION[1], 
                          config.CAMERA_RESOLUTION[0], 3), dtype=np.uint8)
         
-        # Gradient background
         for i in range(frame.shape[0]):
             frame[i, :] = [20 + i//8, 15 + i//10, 35 + i//12]
         
-        # Add text
         cv2.putText(frame, message, (100, 200),
                    cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 165, 255), 2)
         cv2.putText(frame, "Camera: OV5647", (100, 260),
@@ -369,7 +416,6 @@ class EnhancedCameraYOLO:
         self.capture_running = True
         self.detection_running = True
         
-        # Start capture thread
         capture_thread = threading.Thread(
             target=self._capture_frames,
             daemon=True,
@@ -377,7 +423,6 @@ class EnhancedCameraYOLO:
         )
         capture_thread.start()
         
-        # Start detection thread
         if self.model_loaded:
             detection_thread = threading.Thread(
                 target=self._yolo_detection_thread,
@@ -405,7 +450,7 @@ class EnhancedCameraYOLO:
         with self.detection_lock:
             detections = self.detections.copy()
         
-        # Draw detections
+        # Draw detections with enhanced visuals
         for det in detections:
             x1, y1, x2, y2 = det['bbox']
             conf = det['confidence']
@@ -413,27 +458,29 @@ class EnhancedCameraYOLO:
             
             # Color by confidence
             if conf > 0.8:
-                color = (0, 255, 0)  # Green
+                color = (0, 255, 100)  # Bright green
             elif conf > 0.6:
-                color = (0, 165, 255)  # Orange
+                color = (0, 200, 255)  # Orange
             else:
-                color = (0, 0, 255)  # Red
+                color = (0, 100, 255)  # Red
             
-            # Draw box
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
+            # Draw thicker box
+            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 3)
             
-            # Draw label
+            # Draw label with better styling
             label = f"{class_name}: {conf:.2f}"
             (label_w, label_h), _ = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+                label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2
             )
             
-            cv2.rectangle(frame, (x1, y1 - label_h - 10), 
-                         (x1 + label_w + 10, y1), color, -1)
-            cv2.putText(frame, label, (x1 + 5, y1 - 5),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            # Background for label
+            cv2.rectangle(frame, (x1, y1 - label_h - 15), 
+                         (x1 + label_w + 15, y1), color, -1)
+            
+            # Add text
+            cv2.putText(frame, label, (x1 + 7, y1 - 7),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
         
-        # Add overlay
         frame = self._add_overlay(frame, len(detections))
         
         return frame
@@ -443,23 +490,21 @@ class EnhancedCameraYOLO:
         h, w = frame.shape[:2]
         avg_fps = np.mean(list(self.fps_counter)) if self.fps_counter else 0
         
-        # FPS
+        # Enhanced overlay styling
         cv2.putText(frame, f"FPS: {avg_fps:.1f}", (10, 30),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 100), 2)
         
-        # Detection count
-        cv2.putText(frame, f"Objects: {det_count}", (10, 65),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 212, 255), 2)
+        cv2.putText(frame, f"Objects: {det_count}", (10, 70),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 220, 255), 2)
         
-        # Model indicator
         if self.model_loaded:
-            cv2.putText(frame, "YOLOv8", (w - 150, 30),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 255), 2)
+            cv2.putText(frame, "YOLOv8", (w - 150, 35),
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 100, 255), 2)
         
         return frame
     
     def get_frame(self):
-        """Get current frame without detections"""
+        """Get current frame"""
         with self.frame_lock:
             return self.frame.copy() if self.frame is not None else None
     
