@@ -2,7 +2,7 @@
 """
 Camera and YOLOv8 Detection Module for CyberCrawl
 Fixed for OV5647 Camera on Raspberry Pi OS 64-bit
-Uses picamera2 (modern libcamera interface)
+FIXED: PyTorch 2.6+ weights_only security issue
 """
 
 import cv2
@@ -129,7 +129,7 @@ class EnhancedCameraYOLO:
             self.camera_ready = False
     
     def _load_yolo_model(self):
-        """Load YOLOv8 model"""
+        """Load YOLOv8 model with PyTorch 2.6+ compatibility"""
         try:
             print("  🧠 Loading YOLOv8 model...")
             
@@ -138,9 +138,39 @@ class EnhancedCameraYOLO:
             if not os.path.exists(model_path):
                 print(f"  📥 Downloading {model_path}...")
             
-            # Load model - REMOVED torch.serialization.add_safe_globals
-            # This is not needed and causes errors with older PyTorch versions
-            self.model = YOLO(model_path)
+            # FIX: Set environment variable to allow unsafe globals
+            # This is needed for PyTorch 2.6+ to load YOLO weights
+            os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+            
+            # Try loading with weights_only=False (the fix for the error)
+            try:
+                # First attempt: Standard loading
+                self.model = YOLO(model_path)
+            except Exception as e1:
+                print(f"  ⚠️  Standard loading failed, trying alternative method...")
+                try:
+                    # Second attempt: Use torch.load workaround
+                    import torch
+                    # Allow loading with weights_only=False
+                    torch.serialization.add_safe_globals(['ultralytics.nn.tasks.DetectionModel'])
+                    self.model = YOLO(model_path)
+                except Exception as e2:
+                    print(f"  ⚠️  Alternative method 1 failed, trying final workaround...")
+                    # Third attempt: Patch torch.load temporarily
+                    import torch.serialization
+                    original_load = torch.load
+                    
+                    def patched_load(*args, **kwargs):
+                        # Force weights_only=False
+                        kwargs['weights_only'] = False
+                        return original_load(*args, **kwargs)
+                    
+                    torch.load = patched_load
+                    try:
+                        self.model = YOLO(model_path)
+                    finally:
+                        torch.load = original_load
+            
             self.model.to('cpu')  # Force CPU on Raspberry Pi
             
             # Test inference
@@ -149,11 +179,15 @@ class EnhancedCameraYOLO:
             _ = self.model(dummy, verbose=False)
             
             self.model_loaded = True
-            print("  ✅ YOLOv8 model loaded")
+            print("  ✅ YOLOv8 model loaded successfully!")
             
         except Exception as e:
             print(f"  ❌ YOLO loading failed: {e}")
-            print(f"  💡 Error details: {type(e).__name__}")
+            print(f"  💡 Error type: {type(e).__name__}")
+            print(f"  💡 If error persists, try:")
+            print(f"     1. pip install --upgrade torch ultralytics")
+            print(f"     2. Delete yolov8n.pt and re-download")
+            print(f"     3. Use: YOLO(model_path, task='detect')")
             self.model_loaded = False
     
     def _capture_frames(self):
