@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-High Performance Camera and YOLOv8 Object Detection Module
-OPTIMIZED: Better color accuracy, higher FPS, clearer detection boxes
+Enhanced Camera and YOLOv8 Object Detection Module
+Using Picamera2 (rpicam-still backend) for better quality
+With night vision support and full color imaging
 """
 
 import cv2
@@ -12,8 +13,17 @@ from collections import deque
 import os
 import sys
 
+# Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import config
+
+try:
+    from picamera2 import Picamera2
+    from libcamera import Transform, controls
+    PICAMERA2_AVAILABLE = True
+except ImportError:
+    PICAMERA2_AVAILABLE = False
+    print("⚠️  Picamera2 not available - falling back to OpenCV")
 
 try:
     from ultralytics import YOLO
@@ -22,10 +32,18 @@ except ImportError:
     YOLO_AVAILABLE = False
     print("⚠️  YOLOv8 not available")
 
+try:
+    import RPi.GPIO as GPIO
+    GPIO_AVAILABLE = True
+except ImportError:
+    GPIO_AVAILABLE = False
+    print("⚠️  RPi.GPIO not available - night vision disabled")
+
+
 class EnhancedCameraYOLO:
     def __init__(self):
-        """Initialize high-performance camera and YOLO"""
-        print("  🔷 Initializing HIGH PERFORMANCE camera system...")
+        """Initialize camera with Picamera2 and YOLO"""
+        print("  🔷 Initializing enhanced camera system (Picamera2)...")
         
         self.camera = None
         self.frame = None
@@ -42,11 +60,15 @@ class EnhancedCameraYOLO:
         self.last_time = time.time()
         self.frame_count = 0
         
-        # Performance optimization
-        self.skip_frames = 0  # Process every frame for max FPS
-        self.frame_skip_counter = 0
+        # Night vision
+        self.night_vision_enabled = False
+        self.brightness_threshold = config.NIGHT_VISION_THRESHOLD
         
-        # Initialize camera with optimizations
+        # Initialize night vision GPIO
+        if GPIO_AVAILABLE:
+            self._init_night_vision()
+        
+        # Initialize camera
         self._init_camera()
         
         # Load YOLO model
@@ -55,94 +77,163 @@ class EnhancedCameraYOLO:
         if YOLO_AVAILABLE:
             self._load_yolo_model()
         
-        print("  ✅ High-performance camera initialized")
+        print("  ✅ Enhanced camera initialized")
+    
+    def _init_night_vision(self):
+        """Initialize IR LED control for night vision"""
+        try:
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setwarnings(False)
+            GPIO.setup(config.NIGHT_VISION_GPIO, GPIO.OUT)
+            GPIO.output(config.NIGHT_VISION_GPIO, GPIO.LOW)
+            print("  🌙 Night vision GPIO initialized")
+        except Exception as e:
+            print(f"  ⚠️  Night vision GPIO failed: {e}")
+    
+    def _enable_night_vision(self, enable=True):
+        """Toggle IR LEDs for night vision"""
+        if GPIO_AVAILABLE:
+            try:
+                GPIO.output(config.NIGHT_VISION_GPIO, GPIO.HIGH if enable else GPIO.LOW)
+                self.night_vision_enabled = enable
+                status = "ON" if enable else "OFF"
+                print(f"  🌙 Night vision: {status}")
+            except Exception as e:
+                print(f"  ⚠️  Night vision toggle failed: {e}")
     
     def _load_yolo_model(self):
-        """Load YOLOv8 model optimized for speed"""
+        """Load YOLOv8 model"""
         try:
-            print("  🧠 Loading YOLOv8 model (optimized)...")
-            
+            print("  🧠 Loading YOLOv8 model...")
             model_path = config.YOLO_MODEL_PATH
             
-            if os.path.exists(model_path):
-                print(f"     ℹ️  Using local model: {model_path}")
-            else:
-                print(f"     📥 Downloading YOLOv8n (fastest)...")
+            if not os.path.exists(model_path):
+                print(f"     📥 Downloading YOLOv8n...")
                 model_path = 'yolov8n.pt'
             
             self.model = YOLO(model_path)
             self.model.to('cpu')
             
-            # Optimize model for inference
-            print("     ⚡ Optimizing for speed...")
-            self.model.fuse()  # Fuse layers for faster inference
-            
             # Test inference
             dummy_image = np.zeros((480, 640, 3), dtype=np.uint8)
-            results = self.model(dummy_image, verbose=False)
+            self.model(dummy_image, verbose=False)
             
             self.model_loaded = True
-            print("  ✅ YOLOv8 model loaded and optimized")
+            print("  ✅ YOLOv8 model loaded successfully")
             
         except Exception as e:
             print(f"  ❌ YOLO loading error: {e}")
             self.model_loaded = False
     
     def _init_camera(self):
-        """Initialize camera with optimal settings for clarity and FPS"""
-        print("  📹 Initializing camera (HIGH FPS mode)...")
+        """Initialize camera with Picamera2 for best quality"""
+        print("  📹 Initializing Picamera2...")
         
         try:
+            if not PICAMERA2_AVAILABLE:
+                raise Exception("Picamera2 not available")
+            
+            # Create Picamera2 instance
+            self.camera = Picamera2()
+            
+            # Get camera properties
+            print("  📷 Camera detected:")
+            print(f"     Model: {self.camera.camera_properties.get('Model', 'Unknown')}")
+            
+            # Configure for high-quality video capture
+            # Use full color processing for realistic images
+            config_dict = self.camera.create_video_configuration(
+                main={
+                    "size": config.CAMERA_RESOLUTION,
+                    "format": "RGB888"  # Full RGB for true colors
+                },
+                controls={
+                    # Auto exposure and white balance for adaptive lighting
+                    "AeEnable": True,
+                    "AwbEnable": True,
+                    "AwbMode": controls.AwbModeEnum.Auto,
+                    
+                    # Brightness and contrast
+                    "Brightness": 0.0,  # -1.0 to 1.0
+                    "Contrast": 1.2,    # Boost contrast slightly
+                    
+                    # Saturation for vivid colors
+                    "Saturation": 1.3,  # 1.0 = normal, >1.0 = more vivid
+                    
+                    # Sharpness
+                    "Sharpness": 1.5,   # Slightly sharper
+                    
+                    # Frame rate
+                    "FrameRate": config.CAMERA_FPS,
+                    
+                    # Exposure time (auto-adjusted, but set max)
+                    "ExposureTime": None,  # Let it auto-adjust
+                    
+                    # Analog gain (sensitivity)
+                    "AnalogueGain": None,  # Auto
+                    
+                    # Noise reduction
+                    "NoiseReductionMode": controls.draft.NoiseReductionModeEnum.HighQuality,
+                }
+            )
+            
+            self.camera.configure(config_dict)
+            
+            # Start camera
+            print("  ⏳ Starting camera...")
+            self.camera.start()
+            
+            # Warm up camera - give time for auto exposure/white balance
+            print("  ⏳ Warming up camera (auto-exposure)...")
+            warmup_frames = 30
+            for i in range(warmup_frames):
+                frame = self.camera.capture_array()
+                if i % 10 == 0:
+                    brightness = frame.mean()
+                    print(f"     Frame {i+1}/{warmup_frames} - Brightness: {brightness:.1f}")
+                time.sleep(0.1)
+            
+            self.camera_ready = True
+            print("  ✅ Picamera2 initialized successfully!")
+            print("     Full RGB color mode enabled")
+            print("     Auto white balance enabled")
+            print("     High quality noise reduction enabled")
+            self.camera_type = 'picamera2'
+            
+        except Exception as e:
+            print(f"  ❌ Picamera2 initialization failed: {e}")
+            print("  Falling back to OpenCV...")
+            self._init_camera_opencv_fallback()
+    
+    def _init_camera_opencv_fallback(self):
+        """Fallback to OpenCV if Picamera2 fails"""
+        try:
+            print("  📹 Initializing OpenCV camera...")
             self.camera = cv2.VideoCapture(0)
             
             if not self.camera.isOpened():
-                raise Exception("Cannot open camera device")
+                raise Exception("Cannot open camera")
             
-            # HIGH FPS SETTINGS
+            # Set properties
             self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, config.CAMERA_RESOLUTION[0])
             self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_RESOLUTION[1])
-            self.camera.set(cv2.CAP_PROP_FPS, 30)  # Max FPS
-            self.camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # Minimal buffer
+            self.camera.set(cv2.CAP_PROP_FPS, config.CAMERA_FPS)
+            self.camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
             
-            # CLARITY SETTINGS
-            self.camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)  # Auto exposure
-            self.camera.set(cv2.CAP_PROP_AUTOFOCUS, 1)  # Auto focus
-            self.camera.set(cv2.CAP_PROP_BRIGHTNESS, 50)
+            # Enable auto exposure
+            self.camera.set(cv2.CAP_PROP_AUTO_EXPOSURE, 1)
+            self.camera.set(cv2.CAP_PROP_BRIGHTNESS, 55)
             self.camera.set(cv2.CAP_PROP_CONTRAST, 50)
-            self.camera.set(cv2.CAP_PROP_SATURATION, 60)  # Better color saturation
-            self.camera.set(cv2.CAP_PROP_SHARPNESS, 50)  # Sharpness for clarity
+            self.camera.set(cv2.CAP_PROP_SATURATION, 65)  # More vivid colors
             
-            print("     ⏳ Quick warmup (5 seconds)...")
+            # Warmup
+            print("  ⏳ Warming up camera...")
+            for _ in range(30):
+                self.camera.read()
+                time.sleep(0.1)
             
-            # Faster warmup
-            start_time = time.time()
-            valid_frames = 0
-            
-            while (time.time() - start_time) < 5:
-                ret, frame = self.camera.read()
-                
-                if ret and frame is not None and frame.size > 0:
-                    mean_brightness = frame.mean()
-                    
-                    if mean_brightness > 10:
-                        valid_frames += 1
-                        
-                        if valid_frames >= 2:
-                            print(f"     ✅ Camera ready! ({time.time() - start_time:.1f}s)")
-                            
-                            # Flush buffer
-                            for _ in range(5):
-                                self.camera.read()
-                            
-                            self.camera_ready = True
-                            break
-                
-                time.sleep(0.05)
-            
-            if not self.camera_ready:
-                self.camera_ready = True
-            
-            print("  ✅ Camera initialized - HIGH FPS MODE")
+            self.camera_ready = True
+            print("  ✅ OpenCV camera initialized")
             self.camera_type = 'opencv'
             
         except Exception as e:
@@ -152,10 +243,11 @@ class EnhancedCameraYOLO:
             self.camera_ready = False
     
     def _capture_frames(self):
-        """HIGH SPEED frame capture with color correction"""
-        print("  🎥 HIGH SPEED capture thread started")
+        """Continuous frame capture thread with night vision"""
+        print("  🎥 Capture thread started")
         frame_errors = 0
         success_count = 0
+        last_night_check = time.time()
         
         while self.capture_running:
             try:
@@ -163,49 +255,52 @@ class EnhancedCameraYOLO:
                     frame = self._generate_placeholder("Camera not available")
                     with self.frame_lock:
                         self.frame = frame
-                    time.sleep(0.033)
+                    time.sleep(1/config.CAMERA_FPS)
                     continue
                 
-                # Grab frame immediately (no decoding yet) for speed
-                grabbed = self.camera.grab()
+                # Capture frame based on camera type
+                if self.camera_type == 'picamera2':
+                    # Picamera2: Direct array capture
+                    frame = self.camera.capture_array()
+                    
+                    # Frame is already in RGB888 format
+                    if frame is None or frame.size == 0:
+                        frame_errors += 1
+                        time.sleep(0.05)
+                        continue
+                    
+                else:
+                    # OpenCV fallback
+                    ret, frame = self.camera.read()
+                    
+                    if not ret or frame is None or frame.size == 0:
+                        frame_errors += 1
+                        time.sleep(0.05)
+                        continue
+                    
+                    # Convert BGR to RGB for consistency
+                    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 
-                if not grabbed:
-                    frame_errors += 1
-                    if frame_errors > 10:
-                        print("  ⚠️  Camera grab failed - reconnecting...")
-                        try:
-                            self.camera.release()
-                        except:
-                            pass
-                        time.sleep(1)
-                        self._init_camera()
-                        frame_errors = 0
-                    time.sleep(0.01)
-                    continue
-                
-                # Decode frame
-                ret, frame = self.camera.retrieve()
-                
-                if not ret or frame is None or frame.size == 0:
-                    frame_errors += 1
-                    time.sleep(0.01)
-                    continue
-                
+                # Reset error counter on success
                 frame_errors = 0
                 
-                # Resize if needed
+                # Ensure correct resolution
                 if frame.shape[0] != config.CAMERA_RESOLUTION[1] or frame.shape[1] != config.CAMERA_RESOLUTION[0]:
-                    frame = cv2.resize(frame, config.CAMERA_RESOLUTION, interpolation=cv2.INTER_LINEAR)
+                    frame = cv2.resize(frame, config.CAMERA_RESOLUTION)
                 
-                # 🎨 COLOR CORRECTION: BGR to RGB
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                
-                # 🔍 ENHANCE CLARITY (optional - can be disabled for max FPS)
-                # Slight sharpening for better clarity
-                kernel = np.array([[-0.5, -0.5, -0.5],
-                                   [-0.5,  5.0, -0.5],
-                                   [-0.5, -0.5, -0.5]])
-                frame = cv2.filter2D(frame, -1, kernel * 0.3)  # Mild sharpening
+                # Check brightness for night vision
+                current_time = time.time()
+                if current_time - last_night_check > 2.0:  # Check every 2 seconds
+                    brightness = frame.mean()
+                    
+                    if brightness < self.brightness_threshold and not self.night_vision_enabled:
+                        print(f"  🌙 Low light detected ({brightness:.1f}) - enabling night vision")
+                        self._enable_night_vision(True)
+                    elif brightness > self.brightness_threshold + 20 and self.night_vision_enabled:
+                        print(f"  ☀️ Good light detected ({brightness:.1f}) - disabling night vision")
+                        self._enable_night_vision(False)
+                    
+                    last_night_check = current_time
                 
                 # Store frame
                 with self.frame_lock:
@@ -222,20 +317,41 @@ class EnhancedCameraYOLO:
                 
                 # Log progress
                 if success_count == 1:
-                    print(f"  ✅ First frame captured!")
-                elif success_count % 100 == 0:
+                    brightness = frame.mean()
+                    print(f"  ✅ First frame captured! (brightness: {brightness:.1f})")
+                elif success_count % 60 == 0:  # Every 2 seconds at 30fps
                     avg_fps = np.mean(list(self.fps_counter)) if self.fps_counter else 0
-                    print(f"  🚀 Captured {self.frame_count} frames | {avg_fps:.1f} FPS")
+                    brightness = frame.mean()
+                    nv_status = "🌙 ON" if self.night_vision_enabled else "☀️ OFF"
+                    print(f"  ✅ {self.frame_count} frames | {avg_fps:.1f} FPS | brightness: {brightness:.1f} | NV: {nv_status}")
                 
-                # Minimal delay for max FPS
-                time.sleep(0.001)
+                # Small delay to target FPS
+                time.sleep(1.0 / config.CAMERA_FPS)
                 
             except Exception as e:
                 print(f"  ❌ Capture error: {e}")
                 frame_errors += 1
-                time.sleep(0.05)
+                if frame_errors > 10:
+                    print("  ⚠️  Too many errors - reinitializing camera...")
+                    self._reinit_camera()
+                    frame_errors = 0
+                time.sleep(0.1)
         
         print("  🛑 Capture thread stopped")
+    
+    def _reinit_camera(self):
+        """Reinitialize camera on errors"""
+        try:
+            if self.camera_type == 'picamera2' and self.camera:
+                self.camera.stop()
+                time.sleep(0.5)
+                self.camera.start()
+            elif self.camera_type == 'opencv' and self.camera:
+                self.camera.release()
+                time.sleep(0.5)
+                self._init_camera_opencv_fallback()
+        except Exception as e:
+            print(f"  ❌ Reinitialization failed: {e}")
     
     def _generate_placeholder(self, message="Waiting for camera..."):
         """Generate placeholder frame"""
@@ -244,48 +360,38 @@ class EnhancedCameraYOLO:
         
         # Gradient background
         for i in range(frame.shape[0]):
-            frame[i, :] = [30 + i//10, 20 + i//12, 50 + i//8]
+            frame[i, :] = [20 + i//8, 15 + i//10, 35 + i//12]
         
         cv2.putText(frame, message, (100, 200),
-                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 200, 255), 2)
+                   cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 165, 255), 2)
         
         return frame
     
     def _yolo_detection_thread(self):
-        """OPTIMIZED detection thread - every 2nd frame for balance"""
-        print("  🔍 OPTIMIZED detection thread started")
+        """YOLOv8 detection thread"""
+        print("  🔍 Detection thread started")
         
         if not self.model_loaded or self.model is None:
             print("  ⚠️  Detection unavailable - model not loaded")
             self.detection_running = False
             return
         
-        detection_errors = 0
-        frame_counter = 0
-        
         while self.detection_running:
             try:
                 if self.frame is None:
-                    time.sleep(0.01)
-                    continue
-                
-                # Process every 2nd frame for balance between FPS and detection
-                frame_counter += 1
-                if frame_counter % 2 != 0:
-                    time.sleep(0.01)
+                    time.sleep(0.05)
                     continue
                 
                 with self.frame_lock:
                     frame = self.frame.copy()
                 
-                # Run YOLO (expects RGB)
+                # Run YOLO inference
                 results = self.model(
                     frame,
                     conf=config.YOLO_CONFIDENCE_THRESHOLD,
                     iou=config.YOLO_IOU_THRESHOLD,
                     verbose=False,
-                    device='cpu',
-                    half=False  # FP32 for accuracy
+                    device='cpu'
                 )
                 
                 detections = []
@@ -298,7 +404,6 @@ class EnhancedCameraYOLO:
                             x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
                             conf = float(box.conf[0].cpu().numpy())
                             cls = int(box.cls[0].cpu().numpy())
-                            
                             class_name = self.model.names[cls]
                             
                             detection = {
@@ -313,15 +418,11 @@ class EnhancedCameraYOLO:
                 with self.detection_lock:
                     self.detections = detections
                 
-                detection_errors = 0
-                time.sleep(0.01)
+                time.sleep(0.05)  # ~20 detections per second
                 
             except Exception as e:
-                detection_errors += 1
-                if detection_errors > 5:
-                    print(f"  ❌ Detection error: {e}")
-                    detection_errors = 0
-                time.sleep(0.05)
+                print(f"  ❌ Detection error: {e}")
+                time.sleep(0.1)
         
         print("  🛑 Detection thread stopped")
     
@@ -334,130 +435,95 @@ class EnhancedCameraYOLO:
         self.capture_running = True
         self.detection_running = True
         
-        # High priority capture thread
+        # Start capture thread
         capture_thread = threading.Thread(
             target=self._capture_frames,
             daemon=True,
-            name="HighSpeedCapture"
+            name="CameraCapture"
         )
         capture_thread.start()
         
-        # Detection thread
+        # Start detection thread
         if self.model_loaded and self.model is not None:
             detection_thread = threading.Thread(
                 target=self._yolo_detection_thread,
                 daemon=True,
-                name="OptimizedYOLO"
+                name="YOLODetection"
             )
             detection_thread.start()
         
-        print("  ✅ High-speed detection started")
+        print("  ✅ Detection started")
     
     def stop_detection(self):
         """Stop all threads"""
         self.detection_running = False
         self.capture_running = False
-        time.sleep(0.3)
+        time.sleep(0.5)
         self.is_running = False
     
     def get_frame_with_detections(self):
-        """Get frame with HIGH QUALITY detection boxes"""
+        """Get frame with bounding boxes"""
         with self.frame_lock:
             if self.frame is None:
                 return self._generate_placeholder("Initializing camera...")
             frame = self.frame.copy()
         
-        if frame is None or frame.size == 0:
-            return self._generate_placeholder("No frame available")
+        # Convert RGB to BGR for OpenCV drawing
+        frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
         
         with self.detection_lock:
             detections = self.detections.copy()
         
-        # Draw HIGH QUALITY bounding boxes
+        # Draw detections
         for det in detections:
             x1, y1, x2, y2 = det['bbox']
             conf = det['confidence']
             class_name = det['class']
             
-            # VIBRANT COLORS (RGB format)
+            # Color by confidence
             if conf > 0.8:
-                color = (0, 255, 0)  # Bright Green
-                thickness = 3
+                color = (0, 255, 0)
             elif conf > 0.6:
-                color = (255, 165, 0)  # Orange
-                thickness = 2
+                color = (0, 165, 255)
             else:
-                color = (255, 0, 100)  # Pink/Red
-                thickness = 2
+                color = (0, 0, 255)
             
-            # Draw THICK, CLEAR rectangle
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
+            cv2.rectangle(frame_bgr, (x1, y1), (x2, y2), color, 2)
             
-            # Draw CORNER MARKERS for modern look
-            corner_length = 20
-            # Top-left corner
-            cv2.line(frame, (x1, y1), (x1 + corner_length, y1), color, thickness + 1)
-            cv2.line(frame, (x1, y1), (x1, y1 + corner_length), color, thickness + 1)
-            # Top-right corner
-            cv2.line(frame, (x2, y1), (x2 - corner_length, y1), color, thickness + 1)
-            cv2.line(frame, (x2, y1), (x2, y1 + corner_length), color, thickness + 1)
-            # Bottom-left corner
-            cv2.line(frame, (x1, y2), (x1 + corner_length, y2), color, thickness + 1)
-            cv2.line(frame, (x1, y2), (x1, y2 - corner_length), color, thickness + 1)
-            # Bottom-right corner
-            cv2.line(frame, (x2, y2), (x2 - corner_length, y2), color, thickness + 1)
-            cv2.line(frame, (x2, y2), (x2, y2 - corner_length), color, thickness + 1)
-            
-            # Draw CLEAR label with background
             label = f"{class_name}: {conf:.2f}"
-            font = cv2.FONT_HERSHEY_DUPLEX
-            font_scale = 0.7
-            font_thickness = 2
-            text_size = cv2.getTextSize(label, font, font_scale, font_thickness)[0]
+            text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)[0]
             
-            # Label background (semi-transparent effect)
-            bg_x1, bg_y1 = x1, y1 - text_size[1] - 12
-            bg_x2, bg_y2 = x1 + text_size[0] + 12, y1
-            
-            # Draw label background
-            cv2.rectangle(frame, (bg_x1, bg_y1), (bg_x2, bg_y2), color, -1)
-            
-            # Draw text in white for contrast
-            cv2.putText(frame, label, (x1 + 6, y1 - 6), font, font_scale, 
-                       (255, 255, 255), font_thickness, cv2.LINE_AA)
+            cv2.rectangle(frame_bgr, (x1, y1 - text_size[1] - 8), 
+                         (x1 + text_size[0] + 8, y1), color, -1)
+            cv2.putText(frame_bgr, label, (x1 + 4, y1 - 4), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
         
-        # Add overlay info
-        frame = self._add_overlay(frame, len(detections))
+        # Add overlay
+        frame_bgr = self._add_overlay(frame_bgr, len(detections))
         
-        # 🔴 Convert RGB back to BGR for JPEG encoding
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        
-        return frame
+        return frame_bgr
     
     def _add_overlay(self, frame, det_count):
-        """Add HIGH QUALITY overlay info"""
+        """Add FPS and info overlay"""
         h, w = frame.shape[:2]
         avg_fps = np.mean(list(self.fps_counter)) if self.fps_counter else 0
         
-        # Create semi-transparent overlay panel
-        overlay = frame.copy()
+        # FPS
+        cv2.putText(frame, f"FPS: {avg_fps:.1f}", (10, 30), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         
-        # Top-left info panel
-        panel_height = 110
-        cv2.rectangle(overlay, (0, 0), (250, panel_height), (0, 0, 0), -1)
-        frame = cv2.addWeighted(overlay, 0.6, frame, 0.4, 0)
+        # Objects
+        cv2.putText(frame, f"Objects: {det_count}", (10, 65), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 212, 255), 2)
         
-        # FPS counter (larger, clearer)
-        cv2.putText(frame, f"FPS: {avg_fps:.1f}", (10, 35), 
-                   cv2.FONT_HERSHEY_DUPLEX, 0.9, (0, 255, 0), 2, cv2.LINE_AA)
+        # Night vision indicator
+        if self.night_vision_enabled:
+            cv2.putText(frame, "🌙 NV", (w - 100, 30), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
         
-        # Detection count
-        cv2.putText(frame, f"Objects: {det_count}", (10, 70), 
-                   cv2.FONT_HERSHEY_DUPLEX, 0.9, (255, 200, 0), 2, cv2.LINE_AA)
-        
-        # Model indicator
-        cv2.putText(frame, "YOLOv8", (10, 100), 
-                   cv2.FONT_HERSHEY_DUPLEX, 0.7, (255, 0, 255), 2, cv2.LINE_AA)
+        # Model
+        cv2.putText(frame, "YOLOv8", (w - 150, h - 10), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 0, 255), 2)
         
         return frame
     
@@ -469,7 +535,7 @@ class EnhancedCameraYOLO:
             return None
     
     def get_detections(self):
-        """Get current detections list"""
+        """Get current detections"""
         with self.detection_lock:
             return self.detections.copy()
     
@@ -480,15 +546,27 @@ class EnhancedCameraYOLO:
             'fps': round(avg_fps, 1),
             'detections_count': len(self.detections),
             'model_loaded': self.model_loaded,
-            'camera_ready': self.camera_ready
+            'camera_ready': self.camera_ready,
+            'night_vision': self.night_vision_enabled
         }
     
     def cleanup(self):
         """Cleanup resources"""
         print("  Cleaning up camera...")
         self.stop_detection()
+        
         if self.camera:
             try:
-                self.camera.release()
+                if self.camera_type == 'picamera2':
+                    self.camera.stop()
+                else:
+                    self.camera.release()
+            except:
+                pass
+        
+        if GPIO_AVAILABLE:
+            try:
+                GPIO.output(config.NIGHT_VISION_GPIO, GPIO.LOW)
+                GPIO.cleanup([config.NIGHT_VISION_GPIO])
             except:
                 pass
