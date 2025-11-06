@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-OPTIMIZED Configuration for Maximum FPS
-This config will give you 20-25 FPS on Raspberry Pi 3
+Configuration settings for CyberCrawl Spider Robot
+FIXED: Corrected white balance to eliminate blue tint
 """
 
 # ===== Flask Server Settings =====
@@ -55,40 +55,70 @@ SPEED_MULTIPLE = 1.2
 OBSTACLE_THRESHOLD = 20
 MAX_DISTANCE = 200
 
-# ===== OPTIMIZED CAMERA SETTINGS FOR MAXIMUM FPS =====
-# Resolution: Lower = faster FPS
-CAMERA_RESOLUTION = (640, 480)  # Good balance
-
-# Target FPS: Set high, let camera achieve what it can
-CAMERA_FPS = 30
-
-# Camera rotation
+# ===== OPTIMIZED CAMERA SETTINGS =====
+CAMERA_QUALITY_MODE = 'balanced'
+CAMERA_RESOLUTION = (640, 480)
+CAMERA_FPS = 25
+CAMERA_WARMUP_TIME = 2
 CAMERA_ROTATION = 0
 
-# Minimal warmup for faster startup
-CAMERA_WARMUP_TIME = 0.5
+# ===== IMAGE PROCESSING SETTINGS =====
+IMAGE_PROCESSING_PRESET = 'natural_warm'  # New preset to fix blue tint
+ENABLE_DENOISING = True
+ENABLE_CONTRAST_BOOST = True
+ENABLE_SHARPENING = False
+ENABLE_WARM_CORRECTION = True  # New: Enable warm color correction
 
 # ===== YOLOv8 DETECTION SETTINGS =====
-YOLO_MODEL_PATH = 'yolov8n.pt'  # Use nano model (fastest)
+YOLO_MODEL_PATH = 'yolov8n.pt'
 YOLO_CONFIDENCE_THRESHOLD = 0.5
 YOLO_IOU_THRESHOLD = 0.45
 YOLO_MAX_DETECTIONS = 10
 
-# ===== CRITICAL FPS OPTIMIZATION =====
-# Detection interval: Higher = better FPS, less frequent detection
-# 0.2 = Run YOLO every 200ms (5 times per second)
-# This allows camera to run at full speed
-DETECTION_INTERVAL = 0.2  # Increased from 0.12 for better FPS
-
-# Video quality: Lower = faster encoding
-VIDEO_QUALITY = 85  # Reduced from 92 for speed
-
-# Frame buffer
-FRAME_BUFFER_SIZE = 2  # Smaller = lower latency
-
-# Threading
+# ===== PERFORMANCE OPTIMIZATION =====
+DETECTION_INTERVAL = 0.15
+VIDEO_QUALITY = 90
+FRAME_BUFFER_SIZE = 3
 ENABLE_THREADING = True
 MAX_THREAD_WORKERS = 2
+
+# ===== FIXED CAMERA HARDWARE CONTROLS =====
+"""
+FIXED: Corrected white balance settings to eliminate blue tint
+- Changed AWB mode to Indoor (3) for better LED/fluorescent handling
+- Adjusted color gains to warm up the image
+- Increased brightness and saturation slightly
+"""
+CAMERA_CONTROLS = {
+    # Auto White Balance - FIXED for indoor lighting
+    'AwbEnable': True,
+    'AwbMode': 3,  # CHANGED: 3 = Indoor (best for LED/fluorescent lights)
+                   # Try: 1 = Tungsten for incandescent bulbs
+                   # Try: 4 = Daylight if near windows
+    
+    # Auto Exposure
+    'AeEnable': True,
+    'AeExposureMode': 0,
+    'AeConstraintMode': 0,
+    'AeMeteringMode': 0,
+    
+    # Image adjustments - FIXED for warmer, more natural skin tones
+    'Brightness': 0.1,      # CHANGED: Slightly brighter (was 0.0)
+    'Contrast': 1.15,       # CHANGED: Better definition (was 1.0)
+    'Saturation': 1.1,      # CHANGED: More color (was 1.0)
+    'Sharpness': 1.2,       # CHANGED: Slightly sharper (was 1.0)
+    
+    # Noise reduction
+    'NoiseReductionMode': 1,
+    
+    # Color gains - FIXED: Reduce blue, increase red/warmth
+    'ColourGains': (1.35, 0.75),  # CHANGED: (red_gain, blue_gain)
+                                   # red: 1.35 = 35% more warmth
+                                   # blue: 0.75 = 25% less blue cast
+                                   # Adjust if needed:
+                                   # More warmth: (1.4, 0.7) or (1.5, 0.65)
+                                   # Less warmth: (1.2, 0.85) or (1.1, 0.9)
+}
 
 # ===== AUTO MODE SETTINGS =====
 AUTO_MODE_LOOP_DELAY = 0.05
@@ -98,20 +128,86 @@ AUTO_DETECTION_FREQUENCY = 0.5
 NIGHT_VISION_THRESHOLD = 50
 ENABLE_NIGHT_VISION = False
 
-# ===== PERFORMANCE TIPS =====
+# ===== DEBUG SETTINGS =====
+SHOW_FPS_IN_CONSOLE = False
+SHOW_DETECTION_LOGS = False
+
+# ===== COLOR CORRECTION PRESETS =====
 """
-Expected Performance on Raspberry Pi 3:
-- Camera FPS: 20-25 fps
-- Detection Rate: 5 fps (every 200ms)
-- Total CPU: ~60-70%
+Choose the best preset for your lighting conditions:
+"""
 
-To get even MORE FPS:
-1. Lower resolution: CAMERA_RESOLUTION = (320, 240)
-2. Increase detection interval: DETECTION_INTERVAL = 0.3
-3. Disable YOLO completely (comment out model loading)
+# Preset 1: Indoor LED/Fluorescent (Most Common - RECOMMENDED)
+COLOR_CORRECTION_PRESET_INDOOR = {
+    'AwbMode': 3,
+    'ColourGains': (1.35, 0.75),
+    'Brightness': 0.1,
+    'Saturation': 1.1
+}
 
-To improve detection accuracy (at cost of FPS):
-1. Higher resolution: CAMERA_RESOLUTION = (800, 600)
-2. Decrease detection interval: DETECTION_INTERVAL = 0.15
-3. Use better model: YOLO_MODEL_PATH = 'yolov8s.pt'
+# Preset 2: Incandescent/Tungsten Bulbs (Warm Yellow Light)
+COLOR_CORRECTION_PRESET_TUNGSTEN = {
+    'AwbMode': 1,
+    'ColourGains': (1.2, 0.85),
+    'Brightness': 0.05,
+    'Saturation': 1.05
+}
+
+# Preset 3: Natural Daylight (Near Window)
+COLOR_CORRECTION_PRESET_DAYLIGHT = {
+    'AwbMode': 4,
+    'ColourGains': (1.1, 0.9),
+    'Brightness': 0.0,
+    'Saturation': 1.0
+}
+
+# Preset 4: Very Blue Room (Strong Blue Cast)
+COLOR_CORRECTION_PRESET_STRONG_BLUE = {
+    'AwbMode': 1,  # Tungsten mode adds yellow/red
+    'ColourGains': (1.5, 0.65),  # Strong red boost, heavy blue reduction
+    'Brightness': 0.15,
+    'Saturation': 1.15
+}
+
+# Active preset (change this to test different presets)
+ACTIVE_COLOR_PRESET = 'indoor'  # Options: 'indoor', 'tungsten', 'daylight', 'strong_blue'
+
+# ===== APPLY PRESET =====
+def apply_color_preset():
+    """Apply the selected color preset to CAMERA_CONTROLS"""
+    global CAMERA_CONTROLS
+    
+    presets = {
+        'indoor': COLOR_CORRECTION_PRESET_INDOOR,
+        'tungsten': COLOR_CORRECTION_PRESET_TUNGSTEN,
+        'daylight': COLOR_CORRECTION_PRESET_DAYLIGHT,
+        'strong_blue': COLOR_CORRECTION_PRESET_STRONG_BLUE
+    }
+    
+    if ACTIVE_COLOR_PRESET in presets:
+        preset = presets[ACTIVE_COLOR_PRESET]
+        CAMERA_CONTROLS.update(preset)
+        print(f"✅ Applied color preset: {ACTIVE_COLOR_PRESET}")
+
+# Apply preset on import
+apply_color_preset()
+
+# ===== QUICK ADJUSTMENT GUIDE =====
+"""
+IF STILL TOO BLUE:
+1. Increase red gain: ColourGains = (1.4, 0.7) or (1.5, 0.65)
+2. Try Tungsten mode: AwbMode = 1
+3. Use strong_blue preset: ACTIVE_COLOR_PRESET = 'strong_blue'
+
+IF TOO YELLOW/ORANGE:
+1. Decrease red gain: ColourGains = (1.2, 0.85) or (1.1, 0.9)
+2. Try Indoor mode: AwbMode = 3
+3. Use daylight preset: ACTIVE_COLOR_PRESET = 'daylight'
+
+IF TOO DARK:
+1. Increase brightness: Brightness = 0.15 or 0.2
+
+IF TOO BRIGHT/WASHED OUT:
+1. Decrease brightness: Brightness = 0.0 or -0.05
+2. Increase contrast: Contrast = 1.2
 """
